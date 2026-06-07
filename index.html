@@ -202,11 +202,13 @@
         const DROPBOX_LIVE_URL = "https://www.dropbox.com/scl/fi/qryt9lhx1l7igmi6qg3ak/Gorev-Listesi.xlsx?rlkey=w97mop9zlow5xt0d0cwxg8wp2&dl=1";
         const SUPER_KEY = "7124624";
 
-        // RESİMDEKİ GERÇEK PERSONEL İSİMLERİNİN WHITE-LIST DOSYASI (Hatalı algılamaları önler)
+        // GÖNDERDİĞİNİZ RESİMDE YER ALAN EKSİKSİZ 25 KİŞİLİK GERÇEK PERSONEL LİSTESİ (WHITE-LIST)
         const VALID_PERSONNEL_LIST = [
-            "A.AŞİROĞLU", "A.DEMİRKAYA", "A.KOÇ", "D.A.SALTIK", "D.YÖNDEM", 
-            "E.DÖNMEZ", "E.SAVAŞ", "F.BOZKURT", "H.BAKIRCI", "M.DİNER", 
-            "S.CÜREBAL", "Ş.ÖNALAN", "T.ERDEN"
+            "A.AŞİROĞLU", "A.DEMİRKAYA", "A.KOÇ", "A.S.YILMAZ", "B.BOZKURT",
+            "C.YÜCE", "D.A.SALTIK", "D.YÖNDEM", "E.DÖNMEZ", "E.SAVAŞ",
+            "F.BOZKURT", "H.BAKIRCI", "H.M.KAYIKCI", "İ.DUMAN", "K.O.ERDEN",
+            "M.DİNER", "M.EMİN", "M.KAPLAN", "N.KILIÇ", "O.S.DİNÇER",
+            "Ö.FARUK", "S.CÜREBAL", "Ş.ÖNALAN", "T.ERDEN", "Y.UÇAR"
         ];
 
         let rawMatrixData = null;
@@ -402,7 +404,7 @@
                     // Hücrenin sonundaki yedek/ek iş gösteren noktaları ve boşlukları temizleyerek arındırılmış ismi buluyoruz
                     let sanitizedStaffName = cleanStringValue.replace(/\.+$/, "").trim();
 
-                    // Eğer arındırılmış isim yasal personel listemizde (White-list) mevcut ise sürece dahil et
+                    // Eğer arındırılmış isim 25 kişilik yasal personel listemizde (White-list) mevcut ise sürece dahil et
                     if(VALID_PERSONNEL_LIST.includes(sanitizedStaffName)) {
                         
                         // İzin durum kontrolü
@@ -446,11 +448,18 @@
             const selectElement = document.getElementById('staff-dropdown');
             selectElement.innerHTML = "";
             
-            // Sadece resimde onayladığınız personeller dropdown içinde listelenir
+            // Resimdeki 25 personelin tamamı dropdown içinde alfabetik olarak sıralanır
             const sortedArray = VALID_PERSONNEL_LIST.filter(p => uniqueStaffSet.has(p)).sort();
             
             if(sortedArray.length === 0) {
-                selectElement.innerHTML = "<option>Veri Bulunamadı</option>";
+                // Eğer Excel henüz yüklenmemişse tüm white-list'i boş olarak dropdown'a doldur
+                VALID_PERSONNEL_LIST.forEach(staffName => {
+                    const optionNode = document.createElement('option');
+                    optionNode.value = staffName;
+                    optionNode.textContent = staffName;
+                    selectElement.appendChild(optionNode);
+                });
+                selectElement.value = VALID_PERSONNEL_LIST[0];
                 return;
             }
 
@@ -481,7 +490,7 @@
             const personalShiftsList = staffSchedules[selectedStaffName] || [];
 
             if(personalShiftsList.length === 0) {
-                gridContainer.innerHTML = `<div class="col-span-full text-center py-12 bg-white rounded-xl border border-dashed text-slate-400 font-medium text-xs"><i class="fa-solid fa-calendar-xmark text-3xl mb-2 block"></i>Bu takvim döneminde adınıza kayıtlı bir görev eşleşmedi.</div>`;
+                gridContainer.innerHTML = `<div class="col-span-full text-center py-12 bg-white rounded-xl border border-dashed text-slate-400 font-medium text-xs"><i class="fa-solid fa-calendar-xmark text-3xl mb-2 block"></i>Bu takvim döneminde adınıza kayıtlı bir görev ibaresi bulunamadı.</div>`;
                 return;
             }
 
@@ -572,7 +581,7 @@
                 }
             });
 
-            // Resimdeki sıralı tüm personelleri döngüye alıp eğer işi varsa istatistiğe dahil edelim
+            // Resimdeki sıralı tüm 25 personeli döngüye alıp eğer işi varsa istatistiğe dahil edelim
             let diagnosticStatisticsArray = [];
             VALID_PERSONNEL_LIST.forEach(pName => {
                 if(localFilteredSchedules[pName]) {
