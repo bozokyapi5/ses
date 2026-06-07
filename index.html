@@ -80,7 +80,7 @@
             <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                 <div class="md:col-span-1">
                     <h3 class="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                        <i class="fa-solid fa-rotate text-indigo-600 animate-spin-slow"></i> Veri Güncelleme Merkezi
+                        <i class="fa-solid fa-rotate text-indigo-600"></i> Veri Güncelleme Merkezi
                     </h3>
                     <p class="text-[11px] text-slate-500 mt-0.5">Dropbox canlı bağlantısını test edin veya manuel dosyayı sisteme entegre edin.</p>
                 </div>
@@ -190,7 +190,7 @@
             <h3 class="font-bold text-slate-900 text-sm mb-1">Yönetici Kimlik Doğrulaması</h3>
             <p class="text-xs text-slate-500 mb-4">Lütfen tanımlanmış olan özel şifreyi giriniz.</p>
             <input type="password" id="field-gate-pass" placeholder="•••••••" class="w-full text-center tracking-widest font-bold text-xl border border-slate-200 rounded-xl py-2 mb-3 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-            <div id="wrapper-pass-error" class="text-red-500 text-xs font-bold hidden mb-3 animate-shake"><i class="fa-solid fa-circle-exclamation"></i> Şifre Hatalı!</div>
+            <div id="wrapper-pass-error" class="text-red-500 text-xs font-bold hidden mb-3"><i class="fa-solid fa-circle-exclamation"></i> Şifre Hatalı!</div>
             <div class="flex space-x-2">
                 <button onclick="closeAuthModal()" class="w-1/2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs py-2.5 rounded-xl transition-colors cursor-pointer">İptal</button>
                 <button onclick="submitAuthGatePassword()" class="w-1/2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-2.5 rounded-xl transition-colors cursor-pointer">Giriş Yap</button>
@@ -201,6 +201,13 @@
     <script>
         const DROPBOX_LIVE_URL = "https://www.dropbox.com/scl/fi/qryt9lhx1l7igmi6qg3ak/Gorev-Listesi.xlsx?rlkey=w97mop9zlow5xt0d0cwxg8wp2&dl=1";
         const SUPER_KEY = "7124624";
+
+        // RESİMDEKİ GERÇEK PERSONEL İSİMLERİNİN WHITE-LIST DOSYASI (Hatalı algılamaları önler)
+        const VALID_PERSONNEL_LIST = [
+            "A.AŞİROĞLU", "A.DEMİRKAYA", "A.KOÇ", "D.A.SALTIK", "D.YÖNDEM", 
+            "E.DÖNMEZ", "E.SAVAŞ", "F.BOZKURT", "H.BAKIRCI", "M.DİNER", 
+            "S.CÜREBAL", "Ş.ÖNALAN", "T.ERDEN"
+        ];
 
         let rawMatrixData = null;
         let staffSchedules = {};
@@ -391,16 +398,24 @@
                         continue;
                     }
 
-                    // Eğer hücre bir personel ismini temsil ediyorsa:
-                    if(currentProgramName && cleanStringValue.length <= 22 && !cleanStringValue.includes("İÇ YAPIMLAR")) {
+                    // NOKTALI VEYA NOKTASIZ İSİM ANALİZİ VE EŞLEŞTİRME ALGORİTMASI
+                    // Hücrenin sonundaki yedek/ek iş gösteren noktaları ve boşlukları temizleyerek arındırılmış ismi buluyoruz
+                    let sanitizedStaffName = cleanStringValue.replace(/\.+$/, "").trim();
+
+                    // Eğer arındırılmış isim yasal personel listemizde (White-list) mevcut ise sürece dahil et
+                    if(VALID_PERSONNEL_LIST.includes(sanitizedStaffName)) {
+                        
+                        // İzin durum kontrolü
                         if(String(cellNoteValue).toLowerCase().includes("izin") || cleanStringValue.toLowerCase().includes("izin")) continue;
 
-                        let staffNameKey = cleanStringValue;
-                        uniqueStaffSet.add(staffNameKey);
+                        uniqueStaffSet.add(sanitizedStaffName);
 
-                        if(!staffSchedules[staffNameKey]) staffSchedules[staffNameKey] = [];
+                        if(!staffSchedules[sanitizedStaffName]) staffSchedules[sanitizedStaffName] = [];
 
                         let crossJobUniqueKey = dayColumn.cIndex + "_rowIndex_" + rowIndex;
+
+                        // Ek/Yedek iş kontrolü: Orijinal metnin sonunda nokta kalmışsa kartta özel bir ibare gösterelim
+                        let isExtraJob = cleanStringValue.endsWith(".");
 
                         let blockShiftObject = {
                             date: dayColumn.dateTitle,
@@ -409,12 +424,14 @@
                             year: dayColumn.year,
                             program: currentProgramName,
                             hour: currentProgramHour,
-                            uniqueKey: crossJobUniqueKey
+                            uniqueKey: crossJobUniqueKey,
+                            isExtra: isExtraJob
                         };
 
-                        staffSchedules[staffNameKey].push(blockShiftObject);
+                        // Görevi arındırılmış asıl ismin kütüğüne yazıyoruz
+                        staffSchedules[sanitizedStaffName].push(blockShiftObject);
                         mainShiftsLogPool.push({
-                            workerName: staffNameKey,
+                            workerName: sanitizedStaffName,
                             ...blockShiftObject
                         });
                     }
@@ -429,7 +446,9 @@
             const selectElement = document.getElementById('staff-dropdown');
             selectElement.innerHTML = "";
             
-            const sortedArray = Array.from(uniqueStaffSet).sort();
+            // Sadece resimde onayladığınız personeller dropdown içinde listelenir
+            const sortedArray = VALID_PERSONNEL_LIST.filter(p => uniqueStaffSet.has(p)).sort();
+            
             if(sortedArray.length === 0) {
                 selectElement.innerHTML = "<option>Veri Bulunamadı</option>";
                 return;
@@ -442,7 +461,6 @@
                 selectElement.appendChild(optionNode);
             });
 
-            // Varsayılan personel olarak A.DEMİRKAYA seçilsin, yoksa listenin ilki gelsin
             if(uniqueStaffSet.has("A.DEMİRKAYA")) {
                 selectElement.value = "A.DEMİRKAYA";
             } else {
@@ -469,12 +487,20 @@
 
             personalShiftsList.forEach(shift => {
                 const cardNode = document.createElement('div');
-                cardNode.className = "bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 flex flex-col justify-between space-y-4 hover:shadow-md transition-all border-l-4 border-l-teal-500";
+                
+                // Eğer ek/yedek iş ise kartın kenarlığını kehribar turuncusu yapıp etiket koyuyoruz
+                const borderClass = shift.isExtra ? "border-l-4 border-l-amber-500" : "border-l-4 border-l-teal-500";
+                const extraBadge = shift.isExtra ? `<span class="bg-amber-100 text-amber-800 text-[9px] font-bold px-1.5 py-0.5 rounded ml-1 border border-amber-200"><i class="fa-solid fa-circle-plus"></i> Ek/Yedek Görev</span>` : "";
+
+                cardNode.className = `bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 flex flex-col justify-between space-y-4 hover:shadow-md transition-all ${borderClass}`;
                 cardNode.innerHTML = `
                     <div>
                         <div class="flex justify-between items-center text-[10px] font-black uppercase tracking-wider mb-2">
                             <span class="bg-slate-100 px-2 py-0.5 rounded text-slate-600 border border-slate-200">${shift.date}</span>
-                            <span class="text-teal-700 bg-teal-50 px-2 py-0.5 rounded font-bold">${shift.dayName}</span>
+                            <div class="flex items-center">
+                                <span class="text-teal-700 bg-teal-50 px-2 py-0.5 rounded font-bold">${shift.dayName}</span>
+                                ${extraBadge}
+                            </div>
                         </div>
                         <h4 class="text-slate-900 font-extrabold text-sm leading-snug tracking-tight">${shift.program}</h4>
                         <div class="text-[11px] text-slate-500 font-semibold mt-2 flex items-center gap-1">
@@ -546,17 +572,24 @@
                 }
             });
 
-            // Nesneyi diziye çevirip sırala
+            // Resimdeki sıralı tüm personelleri döngüye alıp eğer işi varsa istatistiğe dahil edelim
             let diagnosticStatisticsArray = [];
-            for(let keyName in localFilteredSchedules) {
-                diagnosticStatisticsArray.push({ name: keyName, count: localFilteredSchedules[keyName] });
-            }
+            VALID_PERSONNEL_LIST.forEach(pName => {
+                if(localFilteredSchedules[pName]) {
+                    diagnosticStatisticsArray.push({ name: pName, count: localFilteredSchedules[pName] });
+                } else if(uniqueStaffSet.has(pName)) {
+                    // Listede ismi var ama bu filtreye uygun işi yoksa 0 gün yazıyoruz
+                    diagnosticStatisticsArray.push({ name: pName, count: 0 });
+                }
+            });
+            
+            // En çok nöbet sayısına göre azalan sıralama yapalım
             diagnosticStatisticsArray.sort((a,b) => b.count - a.count);
 
             // Metrik metinlerini güncelle
             document.getElementById('metric-total-staff').textContent = localStaffSet.size;
             document.getElementById('metric-total-shifts').textContent = subsetShiftsCount;
-            document.getElementById('metric-max-staff').textContent = diagnosticStatisticsArray.length > 0 ? `${diagnosticStatisticsArray[0].name} (${diagnosticStatisticsArray[0].count} Gün)` : '-';
+            document.getElementById('metric-max-staff').textContent = diagnosticStatisticsArray.length > 0 && diagnosticStatisticsArray[0].count > 0 ? `${diagnosticStatisticsArray[0].name} (${diagnosticStatisticsArray[0].count} Gün)` : '-';
             document.getElementById('metric-active-date').textContent = selectedMonth === 'ALL' ? 'Tüm Dönemler' : samplePeriodStr;
 
             // Log Kütüğü Tablosunu İnşa Et
