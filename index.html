@@ -66,7 +66,7 @@
                         <h2 id="worker-title-name" class="text-lg font-black text-slate-900 uppercase tracking-tight">-</h2>
                         <p class="text-xs text-slate-500">Haftalık stüdyo, yayın yerleşimleriniz ve çalışma takviminiz.</p>
                     </div>
-                    <div id="sync-timestamp-badge" class="text-[10px] bg-slate-200 text-slate-700 px-3 py-1 rounded-full font-bold shadow-sm"></div>
+                    <div id="sync-timestamp-badge" class="text-[10px] bg-slate-200 text-slate-700 px-3 py-1 rounded-full font-bold shadow-sm">Henüz Yüklenmedi</div>
                 </div>
 
                 <div id="weekly-schedule-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -202,23 +202,36 @@
         const DROPBOX_LIVE_URL = "https://www.dropbox.com/scl/fi/qryt9lhx1l7igmi6qg3ak/Gorev-Listesi.xlsx?rlkey=w97mop9zlow5xt0d0cwxg8wp2&dl=1";
         const SUPER_KEY = "7124624";
 
-        // GÖNDERDİĞİNİZ RESİMDE YER ALAN EKSİKSİZ 25 KİŞİLİK GERÇEK PERSONEL LİSTESİ (WHITE-LIST)
+        // GÖNDERDİĞİNİZ LİSTEDEKİ EKSİKSİZ VE KESİN 25 PERSONEL (ALFABETİK OLARAK SIRALANMIŞTIR)
         const VALID_PERSONNEL_LIST = [
-            "A.AŞİROĞLU", "A.DEMİRKAYA", "A.KOÇ", "A.S.YILMAZ", "B.BOZKURT",
-            "C.YÜCE", "D.A.SALTIK", "D.YÖNDEM", "E.DÖNMEZ", "E.SAVAŞ",
-            "F.BOZKURT", "H.BAKIRCI", "H.M.KAYIKCI", "İ.DUMAN", "K.O.ERDEN",
-            "M.DİNER", "M.EMİN", "M.KAPLAN", "N.KILIÇ", "O.S.DİNÇER",
-            "Ö.FARUK", "S.CÜREBAL", "Ş.ÖNALAN", "T.ERDEN", "Y.UÇAR"
-        ];
+            "A.AŞİROĞLU", "A.C.PEHLİVAN", "A.DEMİRKAYA", "A.KOÇ", "A.KORUN", 
+            "B.BOZKURT", "C.SALTIK", "C.YÜCE", "Ç.TAŞ", "D.A.SALTIK", 
+            "D.YÖNDEM", "E.DÖNMEZ", "E.KOL", "E.SAVAŞ", "E.YURDAGÜL", 
+            "F.BOZKURT", "H.BAKIRCI", "H.HEKİMHAN", "H.M.KAYIKCI", "İ.DUMAN", 
+            "K.GÜNGÖR", "M.DİNER", "N.KILIÇ", "O.S.DİNÇER", "Ö.FARUK", 
+            "Ö.KARAKUŞ", "S.ARAS", "S.AKDAĞ", "S.CÜREBAL", "Ş.ÖNALAN", 
+            "T.ERDEN", "Y.ŞAHİN", "Y.UÇAR"
+        ].filter((value, index, self) => self.indexOf(value) === index); // Güvenlik tekilleştirmesi
+
+        // Sizin yazdığınız spesifik 25 personeli öncelikli kılalım:
+        const USER_EXPLICIT_25 = [
+            "H.BAKIRCI", "A.KOÇ", "C.SALTIK", "D.A.SALTIK", "A.AŞİROĞLU", 
+            "E.YURDAGÜL", "A.DEMİRKAYA", "F.BOZKURT", "H.HEKİMHAN", "Ş.ÖNALAN", 
+            "S.ARAS", "M.DİNER", "D.YÖNDEM", "E.KOL", "A.C.PEHLİVAN", 
+            "T.ERDEN", "S.CÜREBAL", "S.AKDAĞ", "A.KORUN", "Y.ŞAHİN", 
+            "K.GÜNGÖR", "Ç.TAŞ", "E.DÖNMEZ", "Ö.KARAKUŞ", "E.SAVAŞ"
+        ].sort();
 
         let rawMatrixData = null;
         let staffSchedules = {};
-        let uniqueStaffSet = new Set();
         let mainShiftsLogPool = [];
         let currentActiveTab = 'personnel';
         let chartInstanceReference = null;
 
         window.addEventListener('DOMContentLoaded', () => {
+            // İlk açılışta dropdown listesinin boş kalmaması için 25 personeli peşin dolduruyoruz
+            rebuildStaffDropdownOptions();
+
             // Tarayıcı hafızasını yokla
             const localRaw = localStorage.getItem('ses_stored_matrix');
             const localTime = localStorage.getItem('ses_stored_timestamp');
@@ -251,7 +264,7 @@
             }
         }
 
-        // YÖNETİCİ GİRİŞ YETKİ KONTROLÜ (HAFIZA KORUMALI)
+        // YÖNETİCİ GİRİŞ YETKİ KONTROLÜ
         function checkAdminAccess() {
             const sessionIsLive = localStorage.getItem('ses_admin_session_live');
             if(sessionIsLive === 'true') {
@@ -285,11 +298,11 @@
             switchSection('personnel');
         }
 
-        // DROPBOX CANLI BAĞLANTI DENETLEME MOTORU
+        // DROPBOX CANLI BAĞLANTI MOTORU
         async function testDropboxLiveSync() {
             try {
                 const response = await fetch(DROPBOX_LIVE_URL);
-                if(!response.ok) throw new Error("CORS Network Policy Blocked");
+                if(!response.ok) throw new Error("Network response error");
                 const arrayBuffer = await response.arrayBuffer();
                 const uintArray = new Uint8Array(arrayBuffer);
                 const workbook = XLSX.read(uintArray, {type: 'array', cellDates: true});
@@ -300,11 +313,11 @@
                 alert("Dropbox senkronizasyonu başarılı! Güncel liste sisteme aktarıldı.");
             } catch (error) {
                 console.error(error);
-                alert("Dropbox'tan canlı liste çekilirken tarayıcı güvenlik duvarına (CORS) takıldı. Bu durum bilgisayarınızın lokal güvenlik ayarlarından kaynaklanır. Lütfen hemen yandaki 'Manuel Excel Dosyası Yükle' alanını kullanarak indirdiğiniz dosyayı seçin.");
+                alert("Dropbox canlı bağlantısı başarısız oldu. Lütfen hemen yanındaki 'Manuel Excel Dosyası Yükle' alanını kullanarak şefinizin gönderdiği güncel .xlsx dosyasını seçip sisteme yükleyin.");
             }
         }
 
-        // MANUEL DOSYA SEÇİMİ TETİKLENDİĞİNDE
+        // MANUEL DOSYA SEÇİMİ
         function processManualFileLoad(event) {
             const uploadedFile = event.target.files[0];
             if(!uploadedFile) return;
@@ -327,15 +340,14 @@
             localStorage.setItem('ses_stored_timestamp', dateString);
             document.getElementById('sync-timestamp-badge').textContent = "Son Yükleme: " + dateString;
             
-            // Veri yapılarını temizle ve yeniden oluştur
+            // Temizlik yap
             staffSchedules = {};
-            uniqueStaffSet.clear();
             mainShiftsLogPool = [];
             
             compileExcelMatrix(matrixRows);
         }
 
-        // ŞEFİN DETAYLI EXCEL BLOKLARINI ÇÖZÜMLEYEN GELİŞMİŞ MATRİS MOTORU
+        // EXCEL ANALİZ VE MATRİS İŞLEME MOTORU
         function compileExcelMatrix(matrix) {
             if(!matrix || matrix.length < 3) return;
 
@@ -345,7 +357,6 @@
             const rowDays = matrix[0];
             const rowDates = matrix[1];
 
-            // Gün Bloklarını Haritalandır (Her sütun grubu 4'erli adımlarla ilerler)
             let parsedDayColumns = [];
             for (let columnIndex = 1; columnIndex < rowDays.length; columnIndex += 4) {
                 if(rowDays[columnIndex] || rowDates[columnIndex]) {
@@ -375,7 +386,7 @@
                 }
             }
 
-            // Hücreleri tara ve Yapıları doldur
+            // Tüm hücreleri tek tek tara
             parsedDayColumns.forEach(dayColumn => {
                 let currentProgramName = "";
                 let currentProgramHour = "";
@@ -389,7 +400,7 @@
                     let cleanStringValue = String(cellCoreValue).trim();
                     if(cleanStringValue === "" || cleanStringValue === "null") continue;
 
-                    // Eğer hücre büyük harfli başlık, stüdyo veya yayın ismi ise:
+                    // Eğer hücre program, stüdyo veya yayın başlığı ise
                     if(cleanStringValue.includes("YAYIN") || cleanStringValue.includes("STÜDYOSU") || cleanStringValue.includes("SAHNESİ") || cleanStringValue.includes("EZGİLER") || cleanStringValue.includes("ŞENTÜRK") || cleanStringValue.includes("GÜNDEM") || cleanStringValue.includes("AKLI SELİM") || (cleanStringValue === cleanStringValue.toUpperCase() && cleanStringValue.length > 8 && !cleanStringValue.includes("."))) {
                         currentProgramName = cleanStringValue;
                         currentProgramHour = cellHourValue ? String(cellHourValue).trim() : "Belirtilmedi";
@@ -400,23 +411,18 @@
                         continue;
                     }
 
-                    // NOKTALI VEYA NOKTASIZ İSİM ANALİZİ VE EŞLEŞTİRME ALGORİTMASI
-                    // Hücrenin sonundaki yedek/ek iş gösteren noktaları ve boşlukları temizleyerek arındırılmış ismi buluyoruz
+                    // NOKTALI VEYA NOKTASIZ İSİM ANALİZİ
+                    // İsmin sonundaki ek iş noktalarını (.) temizleyerek kök ismi buluyoruz
                     let sanitizedStaffName = cleanStringValue.replace(/\.+$/, "").trim();
 
-                    // Eğer arındırılmış isim 25 kişilik yasal personel listemizde (White-list) mevcut ise sürece dahil et
-                    if(VALID_PERSONNEL_LIST.includes(sanitizedStaffName)) {
+                    // Eğer arındırılmış isim 25 kişilik listemizde veya genel havuzda varsa eşleştir
+                    if(USER_EXPLICIT_25.includes(sanitizedStaffName) || VALID_PERSONNEL_LIST.includes(sanitizedStaffName)) {
                         
-                        // İzin durum kontrolü
                         if(String(cellNoteValue).toLowerCase().includes("izin") || cleanStringValue.toLowerCase().includes("izin")) continue;
-
-                        uniqueStaffSet.add(sanitizedStaffName);
 
                         if(!staffSchedules[sanitizedStaffName]) staffSchedules[sanitizedStaffName] = [];
 
                         let crossJobUniqueKey = dayColumn.cIndex + "_rowIndex_" + rowIndex;
-
-                        // Ek/Yedek iş kontrolü: Orijinal metnin sonunda nokta kalmışsa kartta özel bir ibare gösterelim
                         let isExtraJob = cleanStringValue.endsWith(".");
 
                         let blockShiftObject = {
@@ -430,7 +436,7 @@
                             isExtra: isExtraJob
                         };
 
-                        // Görevi arındırılmış asıl ismin kütüğüne yazıyoruz
+                        // İşi asıl personelin kütüğüne yazıyoruz (Noktalı işler dahil)
                         staffSchedules[sanitizedStaffName].push(blockShiftObject);
                         mainShiftsLogPool.push({
                             workerName: sanitizedStaffName,
@@ -444,36 +450,27 @@
             if(currentActiveTab === 'admin') applyLogFilters();
         }
 
+        // DROPDOWN LİSTESİNİ KESİN OLARAK SİZİN VERDİĞİNİZ 25 KİŞİYLE KİLİTLEYEN VE EKSİKSİZ TUTAN FONKSİYON
         function rebuildStaffDropdownOptions() {
             const selectElement = document.getElementById('staff-dropdown');
+            const cachedSelectedValue = selectElement.value;
             selectElement.innerHTML = "";
             
-            // Resimdeki 25 personelin tamamı dropdown içinde alfabetik olarak sıralanır
-            const sortedArray = VALID_PERSONNEL_LIST.filter(p => uniqueStaffSet.has(p)).sort();
-            
-            if(sortedArray.length === 0) {
-                // Eğer Excel henüz yüklenmemişse tüm white-list'i boş olarak dropdown'a doldur
-                VALID_PERSONNEL_LIST.forEach(staffName => {
-                    const optionNode = document.createElement('option');
-                    optionNode.value = staffName;
-                    optionNode.textContent = staffName;
-                    selectElement.appendChild(optionNode);
-                });
-                selectElement.value = VALID_PERSONNEL_LIST[0];
-                return;
-            }
-
-            sortedArray.forEach(staffName => {
+            // Sizin ilettiğiniz 25 kişilik kesin liste alfabetik olarak her zaman listelenir
+            USER_EXPLICIT_25.forEach(staffName => {
                 const optionNode = document.createElement('option');
                 optionNode.value = staffName;
                 optionNode.textContent = staffName;
                 selectElement.appendChild(optionNode);
             });
 
-            if(uniqueStaffSet.has("A.DEMİRKAYA")) {
+            // Seçim hafızasını koru, yoksa A.DEMİRKAYA varsayılan olsun
+            if(cachedSelectedValue && USER_EXPLICIT_25.includes(cachedSelectedValue)) {
+                selectElement.value = cachedSelectedValue;
+            } else if(USER_EXPLICIT_25.includes("A.DEMİRKAYA")) {
                 selectElement.value = "A.DEMİRKAYA";
             } else {
-                selectElement.value = sortedArray[0];
+                selectElement.value = USER_EXPLICIT_25[0];
             }
             displayStaffCards();
         }
@@ -490,14 +487,14 @@
             const personalShiftsList = staffSchedules[selectedStaffName] || [];
 
             if(personalShiftsList.length === 0) {
-                gridContainer.innerHTML = `<div class="col-span-full text-center py-12 bg-white rounded-xl border border-dashed text-slate-400 font-medium text-xs"><i class="fa-solid fa-calendar-xmark text-3xl mb-2 block"></i>Bu takvim döneminde adınıza kayıtlı bir görev ibaresi bulunamadı.</div>`;
+                gridContainer.innerHTML = `<div class="col-span-full text-center py-12 bg-white rounded-xl border border-dashed border-slate-200 text-slate-400 font-medium text-xs"><i class="fa-solid fa-calendar-xmark text-3xl mb-2 block"></i>Bu takvim döneminde adınıza kayıtlı bir görev ibaresi bulunamadı.</div>`;
                 return;
             }
 
             personalShiftsList.forEach(shift => {
                 const cardNode = document.createElement('div');
                 
-                // Eğer ek/yedek iş ise kartın kenarlığını kehribar turuncusu yapıp etiket koyuyoruz
+                // Eğer ek veya yedek iş ise kenarlık turuncu olur ve özel ibare basılır
                 const borderClass = shift.isExtra ? "border-l-4 border-l-amber-500" : "border-l-4 border-l-teal-500";
                 const extraBadge = shift.isExtra ? `<span class="bg-amber-100 text-amber-800 text-[9px] font-bold px-1.5 py-0.5 rounded ml-1 border border-amber-200"><i class="fa-solid fa-circle-plus"></i> Ek/Yedek Görev</span>` : "";
 
@@ -524,14 +521,13 @@
             });
         }
 
-        // BİR BUTONLA YANINDA ÇALIŞACAK İŞ ARKADAŞLARINI BULMA VE GÖSTERME (MODAL)
+        // AYNI SAATTEKİ EKİP ARKADAŞLARINI BULMA MODALI
         function triggerTeamDiscoveryModal(uniqueKey, programName, dateString) {
             const listContainer = document.getElementById('modal-staff-list');
             const headerContainer = document.getElementById('modal-info-header');
             listContainer.innerHTML = "";
             headerContainer.textContent = `${dateString} - ${programName}`;
 
-            // Havuzdan aynı benzersiz anahtara sahip olan tüm personelleri bul
             const teamMembers = mainShiftsLogPool.filter(s => s.uniqueKey === uniqueKey).map(s => s.workerName);
             const currentViewer = document.getElementById('staff-dropdown').value;
 
@@ -554,7 +550,7 @@
 
         function closeTeamModal() { document.getElementById('modal-team-view').classList.add('hidden'); }
 
-        // ================= YÖNETİCİ PANELİ, LOGLAMA VE TARİHSEL FİLTRE MOTORU =================
+        // ================= YÖNETİCİ PANELİ LOGLAMA VE TARİHSEL ANALİZ MOTORU =================
         function applyLogFilters() {
             const selectedMonth = document.getElementById('filter-month').value;
             const selectedYear = document.getElementById('filter-year').value;
@@ -564,7 +560,7 @@
             let subsetShiftsCount = 0;
             let samplePeriodStr = "-";
 
-            // Ana havuzu filtrelere göre tara ve logla
+            // Havuzdaki verileri filtrelere göre analiz et
             mainShiftsLogPool.forEach(log => {
                 const monthMatch = (selectedMonth === 'ALL' || log.month === selectedMonth);
                 const yearMatch = (selectedYear === 'ALL' || log.year === selectedYear);
@@ -581,47 +577,39 @@
                 }
             });
 
-            // Resimdeki sıralı tüm 25 personeli döngüye alıp eğer işi varsa istatistiğe dahil edelim
+            // 25 PERSONELİN TAMAMINI İSTATİSTİĞE DAHİL ET (Görevi yoksa 0 Gün görünür)
             let diagnosticStatisticsArray = [];
-            VALID_PERSONNEL_LIST.forEach(pName => {
-                if(localFilteredSchedules[pName]) {
-                    diagnosticStatisticsArray.push({ name: pName, count: localFilteredSchedules[pName] });
-                } else if(uniqueStaffSet.has(pName)) {
-                    // Listede ismi var ama bu filtreye uygun işi yoksa 0 gün yazıyoruz
-                    diagnosticStatisticsArray.push({ name: pName, count: 0 });
-                }
+            USER_EXPLICIT_25.forEach(pName => {
+                let shiftCount = localFilteredSchedules[pName] || 0;
+                diagnosticStatisticsArray.push({ name: pName, count: shiftCount });
             });
             
-            // En çok nöbet sayısına göre azalan sıralama yapalım
+            // Azalan düzende sırala (En çok nöbet tutan üstte)
             diagnosticStatisticsArray.sort((a,b) => b.count - a.count);
 
-            // Metrik metinlerini güncelle
-            document.getElementById('metric-total-staff').textContent = localStaffSet.size;
+            // Metrik panellerini güncelle
+            document.getElementById('metric-total-staff').textContent = USER_EXPLICIT_25.length; // Her zaman 25 kişi aktif çalışan
             document.getElementById('metric-total-shifts').textContent = subsetShiftsCount;
-            document.getElementById('metric-max-staff').textContent = diagnosticStatisticsArray.length > 0 && diagnosticStatisticsArray[0].count > 0 ? `${diagnosticStatisticsArray[0].name} (${diagnosticStatisticsArray[0].count} Gün)` : '-';
+            document.getElementById('metric-max-staff').textContent = diagnosticStatisticsArray[0].count > 0 ? `${diagnosticStatisticsArray[0].name} (${diagnosticStatisticsArray[0].count} Gün)` : '-';
             document.getElementById('metric-active-date').textContent = selectedMonth === 'ALL' ? 'Tüm Dönemler' : samplePeriodStr;
 
-            // Log Kütüğü Tablosunu İnşa Et
+            // Yönetici Log Listesi Tablosunu Doldur
             const tableBodyNode = document.getElementById('table-body-admin-logs');
             tableBodyNode.innerHTML = "";
             
-            if(diagnosticStatisticsArray.length === 0) {
-                tableBodyNode.innerHTML = `<tr><td colspan="2" class="p-4 text-center text-slate-400 italic">Seçilen dönemde log kaydı bulunamadı.</td></tr>`;
-            } else {
-                diagnosticStatisticsArray.forEach(stat => {
-                    const rowNode = document.createElement('tr');
-                    rowNode.className = "hover:bg-slate-50 transition-all";
-                    rowNode.innerHTML = `
-                        <td class="p-2.5 font-bold text-slate-800 flex items-center gap-2">
-                            <span class="w-2 h-2 rounded-full bg-indigo-500 shadow-sm block"></span>${stat.name}
-                        </td>
-                        <td class="p-2.5 text-center font-black text-slate-600 bg-slate-50">${stat.count} Gün</td>
-                    `;
-                    tableBodyNode.appendChild(rowNode);
-                });
-            }
+            diagnosticStatisticsArray.forEach(stat => {
+                const rowNode = document.createElement('tr');
+                rowNode.className = "hover:bg-slate-50 transition-all";
+                rowNode.innerHTML = `
+                    <td class="p-2.5 font-bold text-slate-800 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full ${stat.count > 0 ? 'bg-teal-500' : 'bg-slate-300'} shadow-sm block"></span>${stat.name}
+                    </td>
+                    <td class="p-2.5 text-center font-black ${stat.count > 0 ? 'text-slate-800 bg-slate-50' : 'text-slate-400 bg-slate-50/50'}">${stat.count} Gün</td>
+                `;
+                tableBodyNode.appendChild(rowNode);
+            });
 
-            // Chart.js Grafik Güncellemesi
+            // Chart.js Grafik Güncellemesi (25 Personelin Grafiğe Eksiksiz Yansıması)
             const canvasContext = document.getElementById('canvas-admin-chart').getContext('2d');
             if(chartInstanceReference) chartInstanceReference.destroy();
 
@@ -630,13 +618,13 @@
                 data: {
                     labels: diagnosticStatisticsArray.map(s => s.name),
                     datasets: [{
-                        label: 'Çalışılan Toplam Gün (Adet)',
+                        label: 'Çalışılan Toplam Gün',
                         data: diagnosticStatisticsArray.map(s => s.count),
                         backgroundColor: 'rgba(20, 184, 166, 0.85)',
                         borderColor: 'rgb(13, 148, 136)',
                         borderWidth: 1.5,
-                        borderRadius: 6,
-                        barPercentage: 0.55
+                        borderRadius: 4,
+                        barPercentage: 0.6
                     }]
                 },
                 options: {
@@ -645,7 +633,7 @@
                     plugins: { legend: { display: false } },
                     scales: {
                         y: { beginAtZero: true, ticks: { stepSize: 1, font: { weight: 'bold' }, color: '#94a3b8' }, grid: { color: '#f1f5f9' } },
-                        x: { ticks: { font: { size: 10, weight: 'bold' }, color: '#64748b' }, grid: { display: false } }
+                        x: { ticks: { font: { size: 9, weight: 'bold' }, color: '#64748b', maxRotation: 45, minRotation: 45 }, grid: { display: false } }
                     }
                 }
             });
