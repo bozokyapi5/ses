@@ -431,16 +431,29 @@
                         curHour = cellHour ? String(cellHour).trim() : "Belirtilmedi";
                         curKey = dayColumn.dateTitle + "_" + actualColIdx + "_b_" + rIdx; 
                         
-                        // GÜNCELLEME: Hemen bir alt satırı kontrol et, eğer o da bir ek detaysa (isimlendirme değilse) alt başlık yap
-                        curSubDetail = "";
+                        // GÜNCELLEME: İş isminin altındaki 2 hücreyi (rIdx+1 ve rIdx+2) kontrol et ve birleştir
+                        let detailParts = [];
+                        
+                        // 1. Alt Hücre Kontrolü (Örn: V32)
                         if (matrix[rIdx + 1] && matrix[rIdx + 1][actualColIdx]) {
-                            let nextCellVal = String(matrix[rIdx + 1][actualColIdx]).trim();
-                            let sanitizedNext = nextCellVal.replace(/\.+$/, "").trim();
-                            // Eğer alt hücredeki metin 25 personelden biri DEĞİLSE, o işin bir detayı veya lokasyonudur!
-                            if (nextCellVal !== "" && !USER_EXPLICIT_25.includes(sanitizedNext)) {
-                                curSubDetail = nextCellVal;
+                            let firstDetail = String(matrix[rIdx + 1][actualColIdx]).trim();
+                            let sanitizedFirst = firstDetail.replace(/\.+$/, "").trim();
+                            if (firstDetail !== "" && firstDetail !== "null" && !USER_EXPLICIT_25.includes(sanitizedFirst)) {
+                                detailParts.push(firstDetail);
                             }
                         }
+                        
+                        // 2. Alt Hücre Kontrolü (Örn: V33)
+                        if (matrix[rIdx + 2] && matrix[rIdx + 2][actualColIdx]) {
+                            let secondDetail = String(matrix[rIdx + 2][actualColIdx]).trim();
+                            let sanitizedSecond = secondDetail.replace(/\.+$/, "").trim();
+                            if (secondDetail !== "" && secondDetail !== "null" && !USER_EXPLICIT_25.includes(sanitizedSecond)) {
+                                detailParts.push(secondDetail);
+                            }
+                        }
+                        
+                        // Hücreler doluysa aralarına " - " koyarak birleştir
+                        curSubDetail = detailParts.join(" - ");
                         continue;
                     }
 
@@ -455,7 +468,7 @@
                             month: dayColumn.month,
                             year: dayColumn.year,
                             program: curProg || "Genel Görev",
-                            subDetail: curSubDetail, // Detay bilgisini havuza ekle
+                            subDetail: curSubDetail, 
                             hour: curHour || "Belirtilmedi",
                             uniqueKey: curKey || (dayColumn.dateTitle + "_" + rIdx),
                             isProbability: hasDot
@@ -526,7 +539,6 @@
                         let badge = `<span class="bg-sky-600 text-white text-[10px] font-black px-2.5 py-1 rounded-xl block text-center shadow-sm">KESİN GÖREV</span>`;
                         if (shift.isProbability) badge = `<span class="bg-amber-400 text-amber-950 text-[10px] font-black px-2.5 py-1 rounded-xl block text-center shadow-sm"><i class="fa-solid fa-circle-question"></i> İHTİMAL</span>`;
 
-                        // GÜNCELLEME: Eğer bir alt detay/lokasyon açıklaması varsa program adının altına yazdır
                         let programDisplayHtml = `<div class="text-slate-900 font-black text-sm">${shift.program}</div>`;
                         if (shift.subDetail) {
                             programDisplayHtml += `<div class="text-slate-500 font-medium text-xs mt-0.5"><i class="fa-solid fa-location-dot text-slate-400 mr-1"></i>${shift.subDetail}</div>`;
