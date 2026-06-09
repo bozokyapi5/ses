@@ -19,9 +19,8 @@ jobs:
 
       - name: Dropbox Güncel Dosyayı Gizlice İndir
         run: |
-          # Dropbox linkinizin sonundaki ?dl=0 kısmını ?dl=1 yaparak doğrudan indirme bağlantısına dönüştürüyoruz.
-          # NOT: "DROPBOX_LINKINIZ_BURAYA" yazan yere şefinizin sizinle paylaştığı linki yapıştırın.
-          curl -L -o Gorev-Listesi.xlsx "DROPBOX_LINKINIZ_BURAYA?dl=1"
+          # Şefinizin paylaştığı güncel Excel dosyası doğrudan bu bağlantıdan indirilir.
+          curl -L -o Gorev-Listesi.xlsx "https://www.dropbox.com/scl/fi/qryt9lhx1l7igmi6qg3ak/Gorev-Listesixlxx?rlkey=w97mop9zlow5xt0d0cwxg8wp2&e=3&st=w7ogxxi0&dl=1"
 
       - name: Değişiklik Kontrolü ve Web Sitesine Otomatik Yükleme
         run: |
