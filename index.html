@@ -125,7 +125,15 @@
                     <div class="relative bg-orange-50 hover:bg-orange-100 rounded-xl px-4 py-3 border-2 border-dashed border-orange-200 flex items-center justify-center cursor-pointer transition-colors">
                         <label class="text-xs font-black text-orange-800 cursor-pointer flex items-center gap-1.5">
                             <i class="fa-solid fa-file-excel text-orange-600 text-sm"></i> Yeni Excel Yükle
-                        </label>
+			<button onclick="exportSesBackup()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-2 rounded-xl text-xs shadow-md transition-all flex items-center gap-1.5 border border-transparent cursor-pointer">
+    <i class="fa-solid fa-download"></i> Verileri Yedekle
+</button>
+<label for="import-ses-file" class="cursor-pointer bg-amber-600 hover:bg-amber-700 text-white font-bold px-3 py-2 rounded-xl text-xs shadow-md transition-all flex items-center gap-1.5 border border-transparent">
+    <i class="fa-solid fa-upload"></i> Yedeği Geri Yükle
+    <input type="file" id="import-ses-file" accept=".json" class="hidden" onchange="importSesBackup(event)">
+</label>
+                        
+			</label>
                         <input type="file" id="upload-excel-input" accept=".xlsx, .xls" class="absolute inset-0 opacity-0 cursor-pointer w-full" />
                     </div>
                     
@@ -1107,6 +1115,59 @@
             });
             document.getElementById('chart-main-title').innerHTML = `<i class="fa-solid fa-chart-bar text-indigo-500 mr-1"></i> ${p1} vs ${p2} Karşılaştırma Grafiği`;
         }
-    </script>
+    
+// Tarayıcı hafızasındaki (LocalStorage) tüm iş loglarını ve havuzları JSON dosyası olarak indirir
+function exportSesBackup() {
+    const keysToBackup = [
+        'ses_stored_matrix',
+        'ses_staff_leaves_pool',
+        'ses_cumulative_shifts_pool',
+        'ses_cumulative_days_list',
+        'ses_stored_timestamp',
+        'ses_admin_session_live'
+    ];
+    let backupData = {};
+    keysToBackup.forEach(key => {
+        backupData[key] = localStorage.getItem(key);
+    });
+    if (!backupData['ses_stored_matrix']) {
+        alert("Yedeklenecek herhangi bir veri bulunamadı! Önce bir Excel planı yüklemelisiniz.");
+        return;
+    }
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData));
+    const dlAnchorElem = document.createElement('a');
+    dlAnchorElem.setAttribute("href", dataStr);
+    dlAnchorElem.setAttribute("download", "ses_servisi_tam_yedek.json");
+    document.body.appendChild(dlAnchorElem);
+    dlAnchorElem.click();
+    dlAnchorElem.remove();
+}
+
+// İndirilen .json yedek dosyasını diğer cihazda seçince otomatik yükler ve sayfayı yeniler
+function importSesBackup(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const parsedData = JSON.parse(e.target.result);
+            if (parsedData.hasOwnProperty('ses_stored_matrix') && parsedData['ses_stored_matrix'] !== null) {
+                Object.keys(parsedData).forEach(key => {
+                    if (parsedData[key] !== null) {
+                        localStorage.setItem(key, parsedData[key]);
+                    }
+                });
+                alert("Tüm iş logları, personel ve izin verileriniz başarıyla geri yüklendi!");
+                window.location.reload();
+            } else {
+                alert("Hatalı yedek dosyası formatı! Lütfen geçerli bir yedek dosyası seçin.");
+            }
+        } catch (err) {
+            alert("Yedek dosyası okunurken teknik bir hata oluştu.");
+        }
+    };
+    reader.readAsText(file);
+}
+</script>
 </body>
 </html>
